@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type FigmaFrame } from "@/types/audit";
+import FigmaAnalyzing from "./FigmaAnalyzing";
 
 interface FigmaUrlInputProps {
   onFramesFetched: (frames: FigmaFrame[], fileName: string) => void;
@@ -30,6 +31,17 @@ const FigmaUrlInput = ({
       onFetch(url);
     }
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && isValidUrl && !isLoading) {
+      handleFetch();
+    }
+  };
+
+  // Show analyzing screen while loading
+  if (isLoading) {
+    return <FigmaAnalyzing status="extracting" />;
+  }
 
   return (
     <div className="w-full">
@@ -95,26 +107,20 @@ const FigmaUrlInput = ({
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="https://www.figma.com/design/..."
               className="flex-1 px-4 py-3 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
             <button
               onClick={handleFetch}
               disabled={!isValidUrl || isLoading}
-              className={`px-4 py-3 rounded-xl text-sm font-medium transition-all shrink-0 ${
+              className={`px-5 py-3 rounded-xl text-sm font-medium transition-all shrink-0 ${
                 isValidUrl && !isLoading
                   ? "bg-primary text-primary-foreground hover:brightness-110"
                   : "bg-surface-3 text-muted-foreground cursor-not-allowed"
               }`}
             >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
-                  Extracting...
-                </span>
-              ) : (
-                "Extract"
-              )}
+              Extract
             </button>
           </div>
 

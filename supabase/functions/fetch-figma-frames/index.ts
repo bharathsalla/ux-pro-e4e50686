@@ -130,30 +130,36 @@ serve(async (req) => {
 
     // Limit to max 20 frames
     const framesToExport = allFrames.slice(0, 20);
-    const nodeIds = framesToExport.map((f) => f.id).join(",");
 
-    // 3. Export frames as images
-    console.log(`Exporting ${framesToExport.length} frames as images`);
-    const imageResponse = await fetch(
-      `https://api.figma.com/v1/images/${fileKey}?ids=${encodeURIComponent(nodeIds)}&format=png&scale=2`,
-      {
-        headers: {
-          "X-Figma-Token": FIGMA_ACCESS_TOKEN,
-        },
-      }
-    );
-
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error("Figma image export error:", imageResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to export Figma frames as images." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // 3. Export frames as images in batches to avoid render timeout
+    const BATCH_SIZE = 5;
+    const allImages: Record<string, string> = {};
+    
+    for (let i = 0; i < framesToExport.length; i += BATCH_SIZE) {
+      const batch = framesToExport.slice(i, i + BATCH_SIZE);
+      const nodeIds = batch.map((f) => f.id).join(",");
+      
+      console.log(`Exporting batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} frames`);
+      const imageResponse = await fetch(
+        `https://api.figma.com/v1/images/${fileKey}?ids=${encodeURIComponent(nodeIds)}&format=png&scale=1`,
+        {
+          headers: {
+            "X-Figma-Token": FIGMA_ACCESS_TOKEN,
+          },
+        }
       );
-    }
 
-    const imageData = await imageResponse.json();
-    const images = imageData.images || {};
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        console.error("Figma image export error:", imageResponse.status, errorText);
+        // Continue with other batches instead of failing entirely
+        continue;
+      }
+
+      const imageData = await imageResponse.json();
+      const images = imageData.images || {};
+      Object.assign(allImages, images);
+    }
 
     // 4. Build response
     const frames = framesToExport
@@ -161,7 +167,7 @@ serve(async (req) => {
         id: frame.id,
         name: frame.name,
         nodeId: frame.id,
-        imageUrl: images[frame.id] || null,
+        imageUrl: allImages[frame.id] || null,
       }))
       .filter((f) => f.imageUrl !== null);
 
